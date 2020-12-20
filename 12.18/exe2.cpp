@@ -3,70 +3,99 @@
 using namespace cv;
 using namespace std;
 
-float aver(float*a,int n)
-{
-	float sum = 0;
-	float aver = 0;
-	for (int i = 0; i < n; i++) {
-		sum =sum+ a[i];
-	}
-	aver = sum / n;
-	return aver;
-}
-float variance(float*a,int n)
-{
-	float dis = 0;
-	float sum = 0;
+int aver_variance(std::vector<cv::Mat>pics, cv::Mat& Average, cv::Mat& Variance) {
+	int rows = pics[0].rows;
+	int cols = pics[0].cols;
 
-    float average = aver(a, n);
-	for (int i = 0; i < n; i++) {
-		dis = (a[i] -average) * (a[i]-average)+dis;
-	}
-	sum = dis / n;
-	return sum;
-}
 
+	for (int i = 0; i < rows; i++)
+	{
+		for (int j = 0; j < cols; j++)
+		{
+			int sum = 0;
+			float var = 0;
+			//求均值
+			for (int c = 0; c < pics.size(); c++) {
+				sum += pics[c].at<uchar>(i, j);
+			}
+			Average.at<uchar>(i, j) = sum / pics.size();
+			//求方差
+			for (int n = 0; n < pics.size(); n++) {
+				var += pow((pics[n].at<uchar>(i, j) - Average.at<uchar>(i, j)), 2);
+			}
+			Variance.at<float>(i, j) = var / pics.size();
+		}
+	}
+	return 0;
+}
+int Threshold(cv::Mat src, cv::Mat& Average, cv::Mat& Variance,  cv::Mat& dst)
+{
+	int src1;
+	int aver;
+	int dst1;
+	int rows = src.rows;
+	int cols = src.cols;
+
+	for (int i = 0; i < rows; i++)
+	{
+		for (int j = 0; j < cols; j++)
+		{
+			src1 = src.at<uchar>(i, j);
+			aver = Average.at<uchar>(i, j);
+			int dif = abs(src1 - aver);
+			int th = Variance.at<float>(i, j);
+			if (dif > th)
+			{
+				dst.at<uchar>(i, j) = 255;
+			}
+			else {
+				dst.at<uchar>(i, j) = 0;
+			}
+		}
+	}
+	return 0;
+}
 int main()
 {
 	VideoCapture capVideo(0);
 	Mat frame;
-	Mat bgMat;
-	Mat subMat;
-	Mat bny_subMat;
+	Mat Average;
+	Mat Final;
+	Mat Variance;
+	std::vector<cv::Mat>ALL;
+
+
 	int cnt = 0;
+	
 	while (1) {
 
 		capVideo >> frame;
 		cvtColor(frame, frame, COLOR_BGR2GRAY);
-		int length= frame.rows;
-		int height=frame.cols;
-		vector<Mat>every;
-		
-		if (cnt <50) {
-			frame.copyTo(bgMat);
-            every.push_back(frame);
-			cnt++; 
+
+		if (cnt < 50) {
+
+			ALL.push_back(frame);
+			if (cnt == 0) {
+				std::cout << "reading frame " << std::endl;
+			}
+			
+		}
+		else if (cnt == 50) {
+			Average.create(frame.size(), CV_8UC1);
+			Variance.create(frame.size(), CV_32FC1);
+
+			aver_variance(ALL, Average, Variance);
 		}
 
 		else {
-			for(cnt=0;cnt<50;cnt++)
-				for (int i = 0; i < length; i++) {
-					for (int j = 0; j < height; j++) {
-						int bins = length * height;
-						float* every = new float[bins];
-						memset(every, 0, sizeof(float) * bins);
-						delete[]every;
-						aver(every, 50);
-						variance(every, 50);
-						absdiff(frame, bgMat, subMat);//背景图像与当前相减
-						threshold(subMat, bny_subMat, 50, 255, CV_THRESH_BINARY);//差分结果二值化
-					}
-				}
-			imshow("b_subMat", bny_subMat);
-			imshow("subMat", subMat);
+			Final.create(frame.size(), CV_8UC1);
+			Threshold(frame, Average, Variance, Final);
+			imshow("frame", frame);
+			imshow("Final", Final);
 			waitKey(30);
 		}
-
+		cnt++;
 	}
-
+	return 0;
 }
+
